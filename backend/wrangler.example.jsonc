@@ -1,0 +1,10 @@
+{
+ "name":"grosuite-field-api",
+ "main":"worker.ts",
+ "compatibility_date":"2026-09-17",
+ "observability":{"enabled":true},
+ "d1_databases":[{"binding":"DB","database_name":"grosuite-field","database_id":"REPLACE_WITH_YOUR_D1_DATABASE_ID","migrations_dir":"../drizzle"}],
+ "ratelimits":[{"name":"DEVICE_LIMITER","namespace_id":"10501","simple":{"limit":90,"period":60}}],
+ "vars":{"LOCATION_RETENTION_DAYS":"30"},
+ "triggers":{"crons":["15 * * * *"]}
+}

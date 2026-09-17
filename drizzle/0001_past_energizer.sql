@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `shifts_one_active` ON `shifts` (`employee_id`) WHERE "shifts"."ended" IS NULL;

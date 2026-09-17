@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "GroSuite Field",
+    "slug": "grosuite-field",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "fieldpulse",
+    "ios": {
+      "bundleIdentifier": "in.grosuite.field",
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "in.grosuite.field",
+      "allowBackup": false
+    },
+    "plugins": [
+      "expo-dev-client",
+      "expo-secure-store",
+      "expo-sqlite",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "GroSuite Field shares your location with your manager only while your work shift is active, including when the app is in the background.",
+          "locationWhenInUsePermission": "GroSuite Field uses your location to record your work visits during an active shift.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ]
+    ],
+    "icon": "./assets/icon.png"
+  }
+}

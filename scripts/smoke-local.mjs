@@ -1,0 +1,23 @@
+import assert from 'node:assert/strict';
+import {mkdirSync,writeFileSync} from 'node:fs';
+const origin=process.env.SMOKE_ORIGIN??'http://localhost:5173';
+assert.ok(['localhost','127.0.0.1'].includes(new URL(origin).hostname),'Local smoke tests only');
+let response=await fetch(origin+'/api/admin');assert.equal(response.status,401,'Anonymous admin access denied');
+const login=await fetch(origin+'/signin-with-chatgpt?return_to=/',{redirect:'manual'});
+const cookie=login.headers.getSetCookie().map(v=>v.split(';')[0]).join('; ');assert.ok(cookie,'Local sign-in cookie provided');
+async function request(path,body,token){const r=await fetch(origin+path,{method:body?'POST':'GET',headers:{Origin:origin,'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{Cookie:cookie})},...(body?{body:JSON.stringify(body)}:{})});const d=await r.json();assert.ok(r.ok,JSON.stringify({status:r.status,error:d.error}));return d;}
+const employee=await request('/api/admin',{action:'employee',name:'Integration Test',email:'integration@example.com',team:'Test'});
+mkdirSync('.sites-runtime',{recursive:true});writeFileSync('.sites-runtime/cleanup.sql',`DELETE FROM tasks WHERE employee_id='${employee.id}';\nDELETE FROM points WHERE employee_id='${employee.id}';\nDELETE FROM shifts WHERE employee_id='${employee.id}';\nDELETE FROM employees WHERE id='${employee.id}';\n`);
+const {token}=await request('/api/admin',{action:'pair',id:employee.id});
+const {shift}=await request('/api/device',{action:'start',shiftId:crypto.randomUUID(),device:'Android'},token);
+await request('/api/device',{action:'locations',shiftId:shift.id,points:[{id:crypto.randomUUID(),lat:12.975,lng:77.607,accuracy:9,captured:Date.now(),battery:82}]},token);
+const roster=await request('/api/admin');assert.equal(roster.employees.find(e=>e.id===employee.id).lat,12.975);
+const task=await request('/api/admin',{action:'task',employeeId:employee.id,title:'Integration test visit',address:'Test location',due:'2026-09-17'});
+await request('/api/device',{action:'task-status',id:task.id,status:'Completed'},token);
+const route=await request('/api/admin?employee='+employee.id);assert.equal(route.points.length,1);
+await request('/api/device',{action:'stop',shiftId:shift.id,ended:Date.now()},token);
+await request('/api/admin',{action:'revoke',id:employee.id});
+response=await fetch(origin+'/api/device',{headers:{Authorization:'Bearer '+token}});assert.equal(response.status,401);
+response=await fetch(origin+'/api/admin',{method:'POST',headers:{Cookie:cookie,Origin:'https://untrusted.invalid','Content-Type':'application/json'},body:JSON.stringify({action:'employee',name:'Blocked',email:'blocked@example.com',team:'Test'})});assert.equal(response.status,403);
+console.log('PASS: HTTP authentication, employee creation, pairing, shift start, location ingestion, live roster, task completion, route history, shift end, revocation and CSRF rejection.');
+console.log('Remove only this test employee using .sites-runtime/cleanup.sql against the local D1 database.');
