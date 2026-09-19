@@ -4,7 +4,7 @@ Admin dashboard and Android/iOS employee app source for GroSuite's initial 50-pe
 
 The working core covers employee management, device pairing/revocation, on-duty GPS updates, offline queues, route history, shift attendance, field tasks and CSV export. Sample data is separate from the real workspace.
 
-**Release status:** functional implementation and private review deployment; not a certified production release or a signed mobile binary. Read [release requirements](docs/RELEASE.md) before onboarding staff.
+**Release status:** functional implementation, private review deployment, and a locally signed Android pilot APK. See [Android installation and rebuild instructions](docs/ANDROID-PILOT.md). Public backend setup and physical-device validation remain required; this is not a certified production release.
 
 ## Project layout
 

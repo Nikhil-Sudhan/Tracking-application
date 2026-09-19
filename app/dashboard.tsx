@@ -61,7 +61,6 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import {
-  demo,
   initials,
   status,
   type Employee,
@@ -122,27 +121,21 @@ function Picker({
   );
 }
 export default function Dashboard() {
-  const [state, setState] = useState<State>(demo),
-    [mode, setModeValue] = useState("Sample workspace"),
+  const [state, setState] = useState<State>(empty),
     [page, setPage] = useState("Live overview"),
     [search, setSearchValue] = useState(""),
     [team, setTeamValue] = useState("All teams"),
     [filter, setFilterValue] = useState("Everyone"),
-    [selected, setSelectedValue] = useState<string | null>("demo-1"),
+    [selected, setSelectedValue] = useState<string | null>(null),
     [points, setPoints] = useState<Point[]>([]),
     [history, setHistory] = useState(false),
-    [loading, setLoading] = useState(false),
+    [loading, setLoading] = useState(true),
     [error, setError] = useState(""),
     [dialog, setDialog] = useState<"employee" | "task" | "pair" | null>(null),
     [token, setToken] = useState(""),
     [busy, setBusy] = useState(false),
     [clock, setClock] = useState(0);
-  const isDemo = mode === "Sample workspace";
-  const snapshotTime = isDemo
-    ? Math.max(...demo.employees.map((e) => e.lastSeen ?? 0)) + 18000
-    : clock;
-  const viewStatus = (employee: Employee) => status(employee, snapshotTime);
-  const modeRef = useRef(mode);
+  const viewStatus = (employee: Employee) => status(employee, clock);
   function clearRoute() {
     setPoints([]);
     setHistory(false);
@@ -163,18 +156,6 @@ export default function Dashboard() {
     setSelectedValue(value);
     clearRoute();
   }
-  function setMode(value: string) {
-    modeRef.current = value;
-    setModeValue(value);
-    setState(value === "Sample workspace" ? demo : empty);
-    setSelected(value === "Sample workspace" ? "demo-1" : null);
-    setLoading(value !== "Sample workspace");
-    setError("");
-    setTeamValue("All teams");
-    setFilterValue("Everyone");
-    setSearchValue("");
-    if (value !== "Sample workspace") void load();
-  }
   const requestSequence = useRef(0);
   const load = useCallback(async () => {
     const sequence = ++requestSequence.current;
@@ -187,24 +168,21 @@ export default function Dashboard() {
             : "Could not load your team. Please retry.",
         );
       const d = (await r.json()) as State;
-      if (
-        modeRef.current === "My workspace" &&
-        sequence === requestSequence.current
-      ) {
+      if (sequence === requestSequence.current) {
         setState(d);
         setError("");
       }
     } catch (e) {
-      if (modeRef.current === "My workspace") setError((e as Error).message);
+      setError((e as Error).message);
     } finally {
       setLoading(false);
     }
   }, []);
   useEffect(() => {
-    if (isDemo) return;
+    void load();
     const timer = setInterval(load, 15000);
     return () => clearInterval(timer);
-  }, [isDemo, load]);
+  }, [load]);
   useEffect(() => {
     const frame = requestAnimationFrame(() => setClock(Date.now()));
     const t = setInterval(() => setClock(Date.now()), 30000);
@@ -228,12 +206,6 @@ export default function Dashboard() {
     ).length,
     off = state.employees.length - active - unreachable;
   async function mutate(action: string, data: unknown) {
-    if (isDemo) {
-      toast.info(
-        "Switch to My workspace to save changes. Sample data is read-only.",
-      );
-      return null;
-    }
     const r = await fetch("/api/admin", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -286,12 +258,6 @@ export default function Dashboard() {
   }
   async function route() {
     if (!person) return;
-    if (isDemo) {
-      toast.info(
-        "Route history becomes available when a real employee shares locations.",
-      );
-      return;
-    }
     try {
       const r = await fetch(
         "/api/admin?employee=" + encodeURIComponent(person.id),
@@ -348,7 +314,7 @@ export default function Dashboard() {
     );
     const a = document.createElement("a");
     a.href = url;
-    a.download = `grosuite-field-${isDemo ? "sample-" : ""}${page.toLowerCase().replaceAll(" ", "-")}.csv`;
+    a.download = `grosuite-field-${page.toLowerCase().replaceAll(" ", "-")}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -430,16 +396,10 @@ export default function Dashboard() {
             <b>{page}</b>
           </div>
           <div className="top-actions">
-            <span className={"connection " + (isDemo ? "sample" : "")}>
+            <span className="connection">
               <span />
-              {isDemo ? "Sample data" : "Refreshes every 15s"}
+              Refreshes every 15s
             </span>
-            <Picker
-              value={mode}
-              onChange={setMode}
-              items={["Sample workspace", "My workspace"]}
-              label="Workspace"
-            />
           </div>
         </header>
         <div className="page-content">
@@ -482,17 +442,6 @@ export default function Dashboard() {
                 Sign in
               </a>
               <button onClick={load}>Retry</button>
-            </div>
-          )}
-          {isDemo && (
-            <div className="demo-bar">
-              <span>
-                <span className="demo-label">DEMO</span>Explore a sample team in
-                Bengaluru. These are illustrative locations.
-              </span>
-              <button onClick={() => setMode("My workspace")}>
-                Open my workspace <ArrowRight size={14} />
-              </button>
             </div>
           )}
           {page === "Live overview" && (
@@ -557,10 +506,7 @@ export default function Dashboard() {
                 <div className="panel-heading">
                   <div>
                     <h2>
-                      Live team map{" "}
-                      <span className="live-chip">
-                        {isDemo ? "SAMPLE" : "LIVE"}
-                      </span>
+                      Live team map <span className="live-chip">LIVE</span>
                     </h2>
                     <span className="subtle">
                       {employees.length} employees in this view
@@ -579,11 +525,7 @@ export default function Dashboard() {
                     <button
                       aria-label="Refresh team locations"
                       className="icon-button"
-                      onClick={() =>
-                        isDemo
-                          ? toast.info("Sample locations do not update.")
-                          : load()
-                      }
+                      onClick={load}
                     >
                       <RefreshCw size={17} />
                     </button>
@@ -623,9 +565,7 @@ export default function Dashboard() {
                             <span>{e.team}</span>
                             <div>
                               <Badge value={viewStatus(e)} />
-                              <small>
-                                {isDemo ? "Sample" : age(e.lastSeen)}
-                              </small>
+                              <small>{age(e.lastSeen)}</small>
                             </div>
                           </div>
                           <ChevronRight size={15} />
@@ -656,11 +596,11 @@ export default function Dashboard() {
                       selected={selected}
                       onSelect={setSelected}
                       points={points}
-                      now={snapshotTime}
+                      now={clock}
                     />
                     <div className="map-caption">
                       <MapPin size={14} />
-                      {isDemo ? "Bengaluru, India" : "Employee locations"}
+                      Employee locations
                       <span>OpenStreetMap</span>
                     </div>
                     {person && (
@@ -692,7 +632,7 @@ export default function Dashboard() {
                           </span>
                           <span>
                             <Clock3 size={15} />
-                            {isDemo ? "Sample location" : age(person.lastSeen)}
+                            {age(person.lastSeen)}
                           </span>
                         </div>
                         <button className="route-button" onClick={route}>
@@ -781,10 +721,8 @@ export default function Dashboard() {
                         <div>
                           <b>{e.name} has a stale location</b>
                           <small>
-                            {isDemo
-                              ? "Sample alert"
-                              : "Last update " + age(e.lastSeen)}{" "}
-                            · Check location sharing
+                            {"Last update " + age(e.lastSeen)} · Check location
+                            sharing
                           </small>
                         </div>
                         <ChevronRight size={16} />
@@ -1010,7 +948,7 @@ export default function Dashboard() {
                 <h2>Connect your employee apps</h2>
                 <ol>
                   <li>
-                    Open <b>My workspace</b> and add your employees.
+                    Open <b>Team</b> and add your employees.
                   </li>
                   <li>On the Team page, generate a device key.</li>
                   <li>Install the Android or iOS development build.</li>
@@ -1049,9 +987,7 @@ export default function Dashboard() {
             <span>GroSuite Field · Field operations workspace</span>
             <span>
               <ShieldCheck size={13} />
-              {isDemo
-                ? "Illustrative data only"
-                : "Access scoped to your workspace"}
+              Access scoped to your workspace
             </span>
           </footer>
         </div>
@@ -1077,9 +1013,7 @@ export default function Dashboard() {
             <DialogDescription>
               {dialog === "pair"
                 ? "This key grants access to this employee only. Store it securely; it is shown once. Generating a new key revokes the previous one."
-                : isDemo
-                  ? "Switch to My workspace to create real records."
-                  : "Changes will be saved to your workspace."}
+                : "Changes will be saved to your workspace."}
             </DialogDescription>
           </DialogHeader>
           {dialog === "pair" ? (
@@ -1167,7 +1101,7 @@ export default function Dashboard() {
                   </label>
                 </>
               )}
-              <button className="button primary" disabled={busy || isDemo}>
+              <button className="button primary" disabled={busy}>
                 {busy
                   ? "Saving…"
                   : dialog === "employee"

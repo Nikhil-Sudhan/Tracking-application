@@ -110,7 +110,10 @@ async function pauseLocally() {
   if (await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK))
     await Location.stopLocationUpdatesAsync(LOCATION_TASK);
 }
-async function enqueue(locations: Location.LocationObject[]) {
+async function enqueue(
+  locations: Location.LocationObject[],
+  expectedShiftId?: string,
+) {
   const battery = await Battery.getBatteryLevelAsync().catch(() => -1);
   const d = await db();
   await d.withExclusiveTransactionAsync(async (txn) => {
@@ -119,17 +122,23 @@ async function enqueue(locations: Location.LocationObject[]) {
       "active",
     );
     const session = row ? (JSON.parse(row.value) as Session | null) : null;
-    if (!session) return;
+    if (!session) {
+      console.info('[GroSuite location] skipped: no active shift');
+      return;
+    }
+    if (expectedShiftId && session.shiftId !== expectedShiftId) return;
     for (const loc of locations) {
       if (
         loc.mocked ||
         loc.timestamp < session.started ||
         loc.timestamp > Date.now() + 30000 ||
         loc.coords.accuracy === null
-      )
+      ) {
+        console.info('[GroSuite location] rejected', JSON.stringify({mocked: loc.mocked, captured: loc.timestamp, shiftStarted: session.started, now: Date.now(), accuracy: loc.coords.accuracy}));
         continue;
+      }
       await txn.runAsync(
-        "INSERT OR IGNORE INTO queue (id,shiftId,lat,lng,accuracy,captured,battery) VALUES (?,?,?,?,?,?,?,?)",
+        "INSERT OR IGNORE INTO queue (id,shiftId,lat,lng,accuracy,captured,battery) VALUES (?,?,?,?,?,?,?)",
         Crypto.randomUUID(),
         session.shiftId,
         loc.coords.latitude,
@@ -138,6 +147,7 @@ async function enqueue(locations: Location.LocationObject[]) {
         Math.min(Date.now(), loc.timestamp),
         battery < 0 ? null : Math.round(battery * 100),
       );
+      console.info('[GroSuite location] queued');
     }
   });
 }
@@ -145,14 +155,17 @@ TaskManager.defineTask<{ locations: Location.LocationObject[] }>(
   LOCATION_TASK,
   async ({ data, error }) => {
     if (error) {
+      console.warn('[GroSuite location] task error', error.message);
       await setValue("syncError", error.message);
       return;
     }
     if (!data) return;
+    console.info('[GroSuite location] received', data.locations?.length);
     try {
       await enqueue(data.locations);
       await sync();
     } catch (e) {
+      console.warn('[GroSuite location] processing failed', (e as Error).message);
       await setValue("syncError", (e as Error).message);
     }
   },
@@ -185,10 +198,10 @@ export async function startShift() {
   await setValue("pendingStart", null);
   try {
     await Location.startLocationUpdatesAsync(LOCATION_TASK, {
-      accuracy: Location.Accuracy.Balanced,
-      distanceInterval: 25,
+      accuracy: Location.Accuracy.High,
+      distanceInterval: 0,
       timeInterval: 30000,
-      deferredUpdatesInterval: 30000,
+      deferredUpdatesInterval: 0,
       pausesUpdatesAutomatically: false,
       showsBackgroundLocationIndicator: true,
       foregroundService: {
@@ -198,20 +211,23 @@ export async function startShift() {
         notificationColor: "#dc6e37",
       },
     });
-    try {
-      await enqueue([
-        await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        }),
-      ]);
-      await sync();
-    } catch (e) {
-      await setValue("syncError", (e as Error).message);
-    }
   } catch (e) {
     await endShift();
     throw e;
   }
+  // The native service is running: don't hold the shift button behind a GPS fix.
+  // A delayed fix is accepted only for the shift that requested it.
+  void (async () => {
+    try {
+      const position = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+      await enqueue([position], session.shiftId);
+      await sync();
+    } catch (e) {
+      await setValue("syncError", (e as Error).message);
+    }
+  })().catch(() => {});
   return session;
 }
 export async function endShift() {
@@ -233,9 +249,7 @@ export async function endShift() {
   }
   if (await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK))
     await Location.stopLocationUpdatesAsync(LOCATION_TASK);
-  try {
-    await sync();
-  } catch (e) {
-    await setValue("syncError", (e as Error).message);
-  }
+  // Stopping local collection completes immediately, including when offline.
+  // sync persists its own error and the stop remains queued until acknowledged.
+  void sync().catch(() => {});
 }

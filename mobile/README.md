@@ -1,6 +1,6 @@
 # GroSuite Field employee app
 
-React Native + Expo SDK 57, shared Android/iOS source. Native background location requires a development build; Expo Go is not the acceptance environment.
+React Native + Expo SDK 57, shared Android/iOS source. Native background location requires a native build; Expo Go is not the acceptance environment. A standalone signed Android pilot APK and local rebuild instructions are described in [the Android pilot guide](../docs/ANDROID-PILOT.md).
 
 ```sh
 cd mobile
@@ -18,7 +18,7 @@ npx eas-cli build --profile development --platform android
 npx eas-cli build --profile development --platform ios
 ```
 
-Review `app.json` identifiers before generating release credentials. Use `eas.json` production profile for store builds after physical-device validation. The preview profile produces an internal Android APK. No store submission or signing has been performed.
+Use `eas.json` production profile for store builds after physical-device validation. The preview profile produces an internal Android APK. Local pilot signing uses the private key documented in the Android pilot guide; no store submission has been performed.
 
 ## Pairing
 

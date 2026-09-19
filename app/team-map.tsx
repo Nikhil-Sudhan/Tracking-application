@@ -28,8 +28,8 @@ export default function TeamMap({
       if (disposed || !container.current) return;
       lib.current = L;
       const m = L.map(container.current, { zoomControl: false }).setView(
-        [12.976, 77.604],
-        12,
+        [20, 0],
+        2,
       );
       map.current = m;
       L.control.zoom({ position: "bottomright" }).addTo(m);
