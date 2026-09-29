@@ -4,7 +4,7 @@
 
 Employee app, separate admin app, and admin website with live location, offline GPS queues, server-verified geofence clock-in, attendance reports, task assignment, leave approvals, device roles/revocation, and an activity log.
 
-**For the Hostinger Ubuntu VPS, start with [deploy/README.md](deploy/README.md).** Copy the release first; deployment will be completed on the server afterward. See [the continuation notes](docs/SERVER-HANDOFF.md) for implemented scope and remaining acceptance tests. Docker serves the website and API at one HTTPS origin, with a persistent SQLite volume. No server deployment is claimed by the local build.
+**For the Hostinger Ubuntu VPS, start with [deploy/README.md](deploy/README.md).** Read [the backend installation guide](docs/BACKEND-INSTALLATION.md) first if the hosting type is unclear; Azure App Service is a different target and this SQLite release is not ready for production deployment there. Copy the release first; deployment will be completed on the server afterward. See [the continuation notes](docs/SERVER-HANDOFF.md) for implemented scope and remaining acceptance tests. Docker serves the website and API at one HTTPS origin, with a persistent SQLite volume. No server deployment is claimed by the local build.
 
 Local self-hosted checks:
 
