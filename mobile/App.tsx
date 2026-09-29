@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, AppState } from "react-native";
+import { emptyRecords, type RecordsData } from "./src/Records";
 import { EmployeeScreens } from "./src/EmployeeScreens";
 import * as Location from "expo-location";
 import {
@@ -22,6 +23,7 @@ type Task = {
 };
 type CachedEmployee = { employeeId: string; name: string; tasks: Task[] };
 export default function App() {
+  const [records, setRecords] = useState<RecordsData>(emptyRecords);
   const [needsRecovery, setNeedsRecovery] = useState(false);
   const [paired, setPaired] = useState(false),
     [repairMode, setRepairMode] = useState(false),
@@ -61,6 +63,11 @@ export default function App() {
           if ((await credentials())?.token !== savedCredentials.token) return;
           setName(data.employee.name);
           setTasks(data.tasks);
+          setRecords({
+            sites: data.sites ?? [],
+            history: data.history ?? [],
+            leaves: data.leaves ?? [],
+          });
           await setValue("employeeCache", {
             employeeId: data.employee.id,
             name: data.employee.name,
@@ -219,6 +226,20 @@ export default function App() {
   }
   return (
     <EmployeeScreens
+      records={records}
+      onLeave={async (body) => {
+        setBusy(true);
+        try {
+          await api(body);
+          await refresh();
+          return true;
+        } catch (e) {
+          Alert.alert("Could not send request", (e as Error).message);
+          return false;
+        } finally {
+          setBusy(false);
+        }
+      }}
       ready={ready}
       paired={paired}
       repairMode={repairMode}

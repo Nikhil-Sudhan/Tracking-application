@@ -22,6 +22,7 @@ function load(file, mocks = {}, globals = {}) {
   }).outputText;
   vm.runInNewContext(code, { exports, console, URL, ...globals, require: id => {
     if (id in mocks) return mocks[id];
+    if (id === './Records' || id === './src/Records') return load('../src/Records.tsx');
     if (id === 'react') return React;
     if (id === 'react-native') return native;
     if (id === 'expo-status-bar') return { StatusBar: 'StatusBar' };
@@ -45,7 +46,7 @@ test('everyday screen exposes simple actions and keeps setup out of the way', as
   assert.doesNotMatch(text(tree), /Company address|Setup code|API|Sync/);
   const tasksTab = tree.root.findAllByType('Pressable').find(node => node.props.accessibilityRole === 'tab' && node.findByType('Text').children[0] === 'My tasks');
   await act(async () => tasksTab.props.onPress());
-  assert.match(text(tree), /You’re all clear/);
+  assert.match(text(tree), /No assigned tasks/);
   await act(async () => tree.unmount());
 });
 

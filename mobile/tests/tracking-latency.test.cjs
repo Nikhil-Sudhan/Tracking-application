@@ -6,11 +6,12 @@ const vm = require('node:vm');
 const ts = require('typescript');
 const { DatabaseSync } = require('node:sqlite');
 
-function harness() {
+function harness(fenced = false) {
   const sqlDatabase = new DatabaseSync(':memory:');
   sqlDatabase.exec('CREATE TABLE queue (id TEXT PRIMARY KEY,shiftId TEXT NOT NULL,lat REAL NOT NULL,lng REAL NOT NULL,accuracy REAL NOT NULL,captured INTEGER NOT NULL,battery INTEGER)');
   const values = new Map();
   const inserted = [];
+  const requests = [];
   const stops = [];
   let blockNetwork = false, stopped = false;
   let resolveGps, rejectGps;
@@ -64,12 +65,23 @@ function harness() {
   vm.runInNewContext(compiled, {
     exports, require: (id) => { assert.ok(mocks[id], id); return mocks[id]; },
     AbortController, setTimeout: (...args) => setTimeout(...args).unref(), clearTimeout,
-    fetch: () => blockNetwork ? new Promise(() => {}) : Promise.resolve({ ok: true, json: async () => ({ shift: { id: 'shift-one', started: 1 } }) }),
+    fetch: (_url, options) => { requests.push(options.body ? JSON.parse(options.body) : null); return blockNetwork ? new Promise(() => {}) : Promise.resolve({ ok: true, json: async () => options.body ? {shift:{id:'shift-one',started:1}} : {sites:fenced?[{id:'site'}]:[],shift:null} }); },
   });
-  return { exports, values, inserted, resolveGps, rejectGps, stops,
+  return { exports, values, inserted, requests, resolveGps, rejectGps, stops,
     blockNetwork: () => { blockNetwork = true; }, stopped: () => stopped };
 }
 const settle = () => new Promise((resolve) => setImmediate(resolve));
+test('site attendance waits for a fresh GPS fix before sending clock-in', async () => {
+  const h = harness(true);
+  const starting = h.exports.startShift();
+  await settle();
+  assert.ok(!h.requests.some(r => r?.action === 'start'));
+  h.resolveGps({ timestamp: Date.now(), mocked: false, coords: { latitude: 12, longitude: 77, accuracy: 10 } });
+  await starting;
+  const request = h.requests.find(r => r?.action === 'start');
+  assert.equal(request.location.lat, 12);
+  assert.equal(request.location.accuracy, 10);
+});
 
 test('starting a shift completes while the first GPS fix is still pending', { timeout: 2000 }, async () => {
   const h = harness();

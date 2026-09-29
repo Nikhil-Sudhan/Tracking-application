@@ -44,7 +44,7 @@ The private Sites dashboard can save records in its own database. A separate Clo
 
 ## Brand
 
-Name: **GroSuite Field**. The web app reuses the four-colour ring from the company's public website, with dark navigation and blue action buttons. Sample employees are clearly labelled illustrative and are not inserted into the real database.
+Name: **GroSuite Field**. The web app reuses the four-colour ring from the company's public website, with dark navigation and blue action buttons. Fresh installations contain no employee or operational records.
 
 ## Sources
 

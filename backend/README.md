@@ -1,5 +1,7 @@
 # Mobile-accessible API
 
+For an Ubuntu VPS deployment, use [deploy/README.md](../deploy/README.md). `server.mjs` and `sqlite.mjs` reuse the same tracking service as this Worker; they serve the self-hosted website and both Android APIs at one HTTPS origin. The Docker path needs no Cloudflare account. The instructions below are the alternative Cloudflare Worker path.
+
 This Worker reuses `lib/tracking-service.ts`; it does not duplicate business logic. Deploy it to a Cloudflare account controlled by GroSuite. The Sites dashboard proxies admin requests server-side; devices talk directly to `/api/device` with employee-specific keys.
 
 ## Setup

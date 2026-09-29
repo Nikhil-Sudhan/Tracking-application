@@ -1,1 +1,11 @@
-{"cli":{"version":">=16.0.0"},"build":{"development":{"developmentClient":true,"distribution":"internal"},"preview":{"distribution":"internal","android":{"buildType":"apk"}},"production":{"autoIncrement":true}},"submit":{"production":{}}}
+{
+  "cli": { "version": ">=16.0.0" },
+  "build": {
+    "development": { "developmentClient": true, "distribution": "internal" },
+    "preview": { "distribution": "internal", "android": { "buildType": "apk" }, "env": { "APP_VARIANT": "employee" } },
+    "admin-preview": { "distribution": "internal", "android": { "buildType": "apk" }, "env": { "APP_VARIANT": "admin" } },
+    "production": { "autoIncrement": true, "env": { "APP_VARIANT": "employee" } },
+    "admin-production": { "autoIncrement": true, "env": { "APP_VARIANT": "admin" } }
+  },
+  "submit": { "production": {} }
+}

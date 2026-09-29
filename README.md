@@ -1,8 +1,29 @@
 # GroSuite Field
 
+## 0.2 — self-hosted Android pilot
+
+Employee app, separate admin app, and admin website with live location, offline GPS queues, server-verified geofence clock-in, attendance reports, task assignment, leave approvals, device roles/revocation, and an activity log.
+
+**For the Hostinger Ubuntu VPS, start with [deploy/README.md](deploy/README.md).** Copy the release first; deployment will be completed on the server afterward. See [the continuation notes](docs/SERVER-HANDOFF.md) for implemented scope and remaining acceptance tests. Docker serves the website and API at one HTTPS origin, with a persistent SQLite volume. No server deployment is claimed by the local build.
+
+Local self-hosted checks:
+
+```sh
+npm ci
+npm run typecheck
+npm test
+npm run build:selfhost
+```
+
+Fresh installations start empty. Add your employees, attendance sites and tasks after signing in. No demo records or default password are included.
+
+Build the Android variants on the configured Windows build machine with `scripts/build-apk.ps1 -Variant employee` and `scripts/build-apk.ps1 -Variant admin`. Each uses a distinct Android package and can be installed alongside the other. New installations require an HTTPS server address and their own employee/admin key.
+
+The sections below describe the original Sites deployment path, which remains available alongside the self-hosted build.
+
 Admin dashboard and Android/iOS employee app source for GroSuite's initial 50-person field team.
 
-The working core covers employee management, device pairing/revocation, on-duty GPS updates, offline queues, route history, shift attendance, field tasks and CSV export. Sample data is separate from the real workspace.
+The working core covers employee management, device pairing/revocation, on-duty GPS updates, offline queues, route history, shift attendance, field tasks and CSV export.
 
 **Release status:** functional implementation, private review deployment, and a locally signed Android pilot APK. See [Android installation and rebuild instructions](docs/ANDROID-PILOT.md). Public backend setup and physical-device validation remain required; this is not a certified production release.
 

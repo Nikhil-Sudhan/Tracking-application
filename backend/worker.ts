@@ -8,6 +8,8 @@ import {
   failure,
   ApiError,
   digest,
+  adminIdentity,
+  mobileAdminWrite,
 } from "../lib/tracking-service";
 export interface BackendEnv {
   DB: D1Database;
@@ -36,7 +38,10 @@ export default {
           status: 405,
           headers: { Allow: "GET, POST" },
         });
-      if (url.pathname === "/api/device") {
+      if (
+        url.pathname === "/api/device" ||
+        url.pathname === "/api/admin-mobile"
+      ) {
         if (!env.DEVICE_LIMITER)
           throw new ApiError(503, "Request limiter unavailable");
         const auth = request.headers.get("authorization");
@@ -50,6 +55,21 @@ export default {
             { error: "Too many requests. Retry in a minute." },
             { status: 429, headers: { "Retry-After": "60" } },
           );
+        if (url.pathname === "/api/admin-mobile") {
+          const admin = await adminIdentity(env.DB, auth);
+          const result =
+            request.method === "GET"
+              ? await adminRead(
+                  env.DB,
+                  admin.owner,
+                  url.searchParams.get("employee"),
+                )
+              : await mobileAdminWrite(env.DB, admin, await readBody(request));
+          return json({
+            ...result,
+            access: { label: admin.label, role: admin.role },
+          });
+        }
         const employee = await deviceIdentity(env.DB, auth);
         return json(
           request.method === "GET"

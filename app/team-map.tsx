@@ -1,7 +1,13 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import type * as Leaflet from "leaflet";
-import { initials, status, type Employee, type Point } from "@/lib/model";
+import {
+  initials,
+  status,
+  type Employee,
+  type Point,
+  type Geofence,
+} from "@/lib/model";
 import "leaflet/dist/leaflet.css";
 export default function TeamMap({
   employees,
@@ -9,13 +15,22 @@ export default function TeamMap({
   onSelect,
   points,
   now,
+  geofences = [],
+  onPick,
 }: {
   employees: Employee[];
   selected: string | null;
   onSelect: (id: string) => void;
   points: Point[];
   now: number;
+  geofences?: Geofence[];
+  onPick?: (lat: number, lng: number) => void;
 }) {
+  const pick = useRef(onPick);
+  useEffect(() => {
+    pick.current = onPick;
+  }, [onPick]);
+  const viewport = useRef("");
   const container = useRef<HTMLDivElement>(null),
     map = useRef<Leaflet.Map | null>(null),
     layer = useRef<Leaflet.LayerGroup | null>(null),
@@ -28,10 +43,11 @@ export default function TeamMap({
       if (disposed || !container.current) return;
       lib.current = L;
       const m = L.map(container.current, { zoomControl: false }).setView(
-        [20, 0],
-        2,
+        [20.5937, 78.9629],
+        5,
       );
       map.current = m;
+      m.on("click", (e) => pick.current?.(e.latlng.lat, e.latlng.lng));
       L.control.zoom({ position: "bottomright" }).addTo(m);
       L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution:
@@ -56,6 +72,18 @@ export default function TeamMap({
       g = layer.current;
     if (!ready || !m || !L || !g) return;
     g.clearLayers();
+    geofences.forEach((site) => {
+      const label = document.createElement("span");
+      label.textContent = site.name + " · " + site.radius + " m";
+      L.circle([site.lat, site.lng], {
+        radius: site.radius,
+        color: "#17694f",
+        weight: 2,
+        fillOpacity: 0.12,
+      })
+        .bindTooltip(label)
+        .addTo(g);
+    });
     const located = employees.filter((e) => e.lat !== null && e.lng !== null);
     located.forEach((e) => {
       const state = status(e, now);
@@ -84,21 +112,38 @@ export default function TeamMap({
       }).addTo(g);
     });
     const employee = located.find((e) => e.id === selected);
+    const viewKey =
+      selected +
+      ":" +
+      points.length +
+      ":" +
+      geofences.map((s) => s.id + s.lat + s.lng + s.radius).join(",") +
+      ":" +
+      located.map((e) => e.id).join(",");
     if (points.length > 1) {
       const route = L.polyline(
         points.map((p) => [p.lat, p.lng]),
         { color: "#2a6df4", weight: 4, dashArray: "8 6" },
       ).addTo(g);
-      m.fitBounds(route.getBounds(), { padding: [55, 55] });
+      if (viewport.current !== viewKey)
+        m.fitBounds(route.getBounds(), { padding: [55, 55] });
     } else if (employee) {
-      m.panTo([employee.lat!, employee.lng!]);
-    } else if (located.length) {
+      if (viewport.current !== viewKey)
+        m.setView([employee.lat!, employee.lng!], 15);
+    } else if (located.length && viewport.current !== viewKey) {
       m.fitBounds(L.latLngBounds(located.map((e) => [e.lat!, e.lng!])), {
         padding: [65, 65],
         maxZoom: 14,
       });
+    } else if (geofences.length && viewport.current !== viewKey) {
+      const bounds = L.latLngBounds(geofences.map((s) => [s.lat, s.lng]));
+      geofences.forEach((s) =>
+        bounds.extend(L.latLng(s.lat, s.lng).toBounds(s.radius * 2)),
+      );
+      m.fitBounds(bounds, { padding: [35, 35], maxZoom: 16 });
     }
-  }, [ready, employees, selected, onSelect, points, now]);
+    viewport.current = viewKey;
+  }, [ready, employees, selected, onSelect, points, now, geofences]);
   return (
     <div
       ref={container}

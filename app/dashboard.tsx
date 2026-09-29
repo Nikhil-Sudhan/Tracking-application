@@ -1,6 +1,5 @@
 "use client";
 import { useCallback, useEffect, useState, useRef } from "react";
-import Link from "next/link";
 import {
   Activity,
   ArrowDownToLine,
@@ -34,6 +33,7 @@ import {
   SidebarMenuButton,
   SidebarProvider,
   SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import {
   Dialog,
@@ -68,14 +68,34 @@ import {
   type Point,
 } from "@/lib/model";
 import TeamMap from "./team-map";
+import Operations from "./operations";
 const nav = [
   { name: "Live overview", icon: LayoutGrid },
   { name: "Team", icon: Users },
   { name: "Attendance", icon: Clock3 },
   { name: "Tasks", icon: BriefcaseBusiness },
+  { name: "Sites & geofences", icon: MapPin },
+  { name: "Leave requests", icon: Check },
+  { name: "Alerts", icon: Activity },
+  { name: "Activity log", icon: Clock3 },
+  { name: "Admin devices", icon: Smartphone },
   { name: "Settings", icon: Settings2 },
 ];
 const empty: State = { employees: [], tasks: [], shifts: [] };
+function NavigationButton(
+  props: React.ComponentProps<typeof SidebarMenuButton>,
+) {
+  const { setOpenMobile } = useSidebar();
+  return (
+    <SidebarMenuButton
+      {...props}
+      onClick={(event) => {
+        props.onClick?.(event);
+        setOpenMobile(false);
+      }}
+    />
+  );
+}
 const age = (n: number | null) =>
   n
     ? `${Math.max(0, Math.floor((Date.now() - n) / 60000))} min ago`
@@ -120,7 +140,9 @@ function Picker({
     </Select>
   );
 }
-export default function Dashboard() {
+export default function Dashboard({
+  onSignOut,
+}: { onSignOut?: () => void } = {}) {
   const [state, setState] = useState<State>(empty),
     [page, setPage] = useState("Live overview"),
     [search, setSearchValue] = useState(""),
@@ -179,9 +201,12 @@ export default function Dashboard() {
     }
   }, []);
   useEffect(() => {
-    void load();
+    const initial = setTimeout(() => void load(), 0);
     const timer = setInterval(load, 15000);
-    return () => clearInterval(timer);
+    return () => {
+      clearTimeout(initial);
+      clearInterval(timer);
+    };
   }, [load]);
   useEffect(() => {
     const frame = requestAnimationFrame(() => setClock(Date.now()));
@@ -324,7 +349,12 @@ export default function Dashboard() {
     >
       <Sidebar className="app-sidebar">
         <SidebarHeader>
-          <Link className="brand" href="/">
+          <button
+            type="button"
+            className="brand"
+            aria-label="Go to live overview"
+            onClick={() => setPage("Live overview")}
+          >
             <span className="brand-lockup">
               <span className="brand-word">
                 GR
@@ -338,7 +368,7 @@ export default function Dashboard() {
               </span>
               <small>FIELD</small>
             </span>
-          </Link>
+          </button>
           <div className="workspace-label">
             <span className="workspace-icon">F</span>
             <div>
@@ -352,7 +382,7 @@ export default function Dashboard() {
           <SidebarMenu>
             {nav.map((n) => (
               <SidebarMenuItem key={n.name}>
-                <SidebarMenuButton
+                <NavigationButton
                   isActive={page === n.name}
                   onClick={() => setPage(n.name)}
                   className="nav-button"
@@ -367,7 +397,7 @@ export default function Dashboard() {
                       }
                     </span>
                   )}
-                </SidebarMenuButton>
+                </NavigationButton>
               </SidebarMenuItem>
             ))}
           </SidebarMenu>
@@ -396,9 +426,14 @@ export default function Dashboard() {
             <b>{page}</b>
           </div>
           <div className="top-actions">
+            {onSignOut && (
+              <button className="button secondary" onClick={onSignOut}>
+                Sign out
+              </button>
+            )}
             <span className="connection">
               <span />
-              Refreshes every 15s
+              {error ? "Connection interrupted" : "Refreshes every 15s"}
             </span>
           </div>
         </header>
@@ -416,29 +451,44 @@ export default function Dashboard() {
                       ? "Shift records, from clock-in to clock-out."
                       : page === "Tasks"
                         ? "Assign visits and track task completion."
-                        : "Set up your field operations workspace."}
+                        : page === "Sites & geofences"
+                          ? "Manage where your team can clock in."
+                          : page === "Leave requests"
+                            ? "Review time off and keep decisions in one place."
+                            : page === "Alerts"
+                              ? "Location and device exceptions during active shifts."
+                              : page === "Activity log"
+                                ? "Recent changes across your workspace."
+                                : page === "Admin devices"
+                                  ? "Manage access for your operations team’s phones."
+                                  : "Set up your field operations workspace."}
               </p>
             </div>
-            <div className="heading-actions">
-              <button className="button secondary" onClick={exportCsv}>
-                <ArrowDownToLine size={16} />
-                Export
-              </button>
-              <button
-                className="button primary"
-                onClick={() =>
-                  setDialog(page === "Tasks" ? "task" : "employee")
-                }
-              >
-                <Plus size={17} />
-                {page === "Tasks" ? "Assign task" : "Add employee"}
-              </button>
-            </div>
+            {["Live overview", "Team", "Tasks"].includes(page) && (
+              <div className="heading-actions">
+                <button className="button secondary" onClick={exportCsv}>
+                  <ArrowDownToLine size={16} />
+                  Export team
+                </button>
+                <button
+                  className="button primary"
+                  onClick={() =>
+                    setDialog(page === "Tasks" ? "task" : "employee")
+                  }
+                >
+                  <Plus size={17} />
+                  {page === "Tasks" ? "Assign task" : "Add employee"}
+                </button>
+              </div>
+            )}
           </div>
           {error && (
             <div role="alert" className="error-box">
               {error}{" "}
-              <a href="/signin-with-chatgpt?return_to=/" target="_top">
+              <a
+                href={onSignOut ? "/" : "/signin-with-chatgpt?return_to=/"}
+                target="_top"
+              >
                 Sign in
               </a>
               <button onClick={load}>Retry</button>
@@ -592,6 +642,7 @@ export default function Dashboard() {
                   </aside>
                   <div className="map-region">
                     <TeamMap
+                      geofences={state.geofences?.filter((s) => s.active)}
                       employees={employees}
                       selected={selected}
                       onSelect={setSelected}
@@ -822,68 +873,20 @@ export default function Dashboard() {
               )}
             </section>
           )}
-          {page === "Attendance" && (
-            <section className="table-panel">
-              <div className="panel-heading">
-                <h2>Shift log</h2>
-                <span className="subtle">
-                  Latest 200 shifts · your local timezone
-                </span>
-              </div>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    {[
-                      "Employee",
-                      "Clock-in",
-                      "Clock-out",
-                      "Duration",
-                      "Status",
-                    ].map((s) => (
-                      <TableHead key={s}>{s}</TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {state.shifts.map((s) => (
-                    <TableRow key={s.id}>
-                      <TableCell>
-                        {
-                          state.employees.find((e) => e.id === s.employeeId)
-                            ?.name
-                        }
-                      </TableCell>
-                      <TableCell>
-                        {new Date(s.started).toLocaleString()}
-                      </TableCell>
-                      <TableCell>
-                        {s.ended ? new Date(s.ended).toLocaleString() : "—"}
-                      </TableCell>
-                      <TableCell>
-                        {Math.max(
-                          0,
-                          Math.round(
-                            ((s.ended || clock || s.started) - s.started) /
-                              60000,
-                          ),
-                        )}{" "}
-                        min
-                      </TableCell>
-                      <TableCell>
-                        <Badge value={s.ended ? "Off duty" : "On duty"} />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              {!state.shifts.length && (
-                <div className="empty-state">
-                  <Clock3 />
-                  <b>No shift records yet</b>
-                  <p>Clock-ins from the employee app will appear here.</p>
-                </div>
-              )}
-            </section>
+          {[
+            "Attendance",
+            "Sites & geofences",
+            "Leave requests",
+            "Alerts",
+            "Activity log",
+            "Admin devices",
+          ].includes(page) && (
+            <Operations
+              page={page}
+              state={state}
+              mutate={mutate}
+              clock={clock}
+            />
           )}
           {page === "Tasks" && (
             <div className="task-board">
@@ -951,14 +954,15 @@ export default function Dashboard() {
                     Open <b>Team</b> and add your employees.
                   </li>
                   <li>On the Team page, generate a device key.</li>
-                  <li>Install the Android or iOS development build.</li>
+                  <li>
+                    Install GroSuite Field on the employee’s Android phone.
+                  </li>
                   <li>Enter your mobile API address and the device key.</li>
                   <li>Allow location access and start a shift.</li>
                 </ol>
                 <p className="notice">
-                  Native builds and a mobile-accessible API deployment are
-                  required. This private preview uses browser sign-in and is not
-                  a native API endpoint.
+                  Use your server’s HTTPS address in both mobile apps. Employee
+                  keys come from Team; admin keys come from Admin devices.
                 </p>
               </section>
               <section className="mini-panel settings-card">
@@ -977,8 +981,9 @@ export default function Dashboard() {
                   <li>Offline points: queued on the device</li>
                 </ul>
                 <p className="notice">
-                  Production rollout still needs device testing, retention
-                  configuration, monitoring, backups, and signed store releases.
+                  Location records follow your server’s retention period.
+                  Clock-in site checks apply to active sites assigned to the
+                  employee’s team.
                 </p>
               </section>
             </div>
@@ -987,7 +992,7 @@ export default function Dashboard() {
             <span>GroSuite Field · Field operations workspace</span>
             <span>
               <ShieldCheck size={13} />
-              Access scoped to your workspace
+              Workspace access
             </span>
           </footer>
         </div>

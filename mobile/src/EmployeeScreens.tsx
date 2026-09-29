@@ -15,6 +15,7 @@ import {
   View,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import {Records, type RecordsData} from "./Records";
 import type { Session } from "./store";
 
 type Task = {
@@ -25,6 +26,8 @@ type Task = {
   status: string;
 };
 type Props = {
+  records?: RecordsData;
+  onLeave?: (body:Record<string,unknown>)=>Promise<boolean>;
   ready: boolean;
   paired: boolean;
   repairMode: boolean;
@@ -50,7 +53,7 @@ type Props = {
 };
 
 export function EmployeeScreens(p: Props) {
-  const [tab, setTab] = useState<"work" | "tasks" | "help">("work");
+  const [tab, setTab] = useState<"work" | "tasks" | "records" | "help">("work");
   const [showSetup, setShowSetup] = useState(false);
   const working = !!p.session;
   const openTasks = p.tasks.filter((task) => task.status !== "Completed");
@@ -106,7 +109,7 @@ export function EmployeeScreens(p: Props) {
           <Text style={s.logo}>
             GroSuite <Text style={s.brandAccent}>Field</Text>
           </Text>
-          <Text style={s.headerNote}>Your workday, made simple</Text>
+          <Text style={s.headerNote}>Employee workspace</Text>
         </View>
         {p.paired && (
           <View style={[s.badge, working && s.activeBadge]}>
@@ -240,7 +243,7 @@ export function EmployeeScreens(p: Props) {
               </Text>
             )}
           </>
-        ) : tab === "tasks" ? (
+        ) : tab === "records" ? (<Records data={p.records??{sites:[],history:[],leaves:[]}} busy={p.busy} onLeave={p.onLeave??(async()=>false)}/>) : tab === "tasks" ? (
           <>
             <Text style={s.eyebrow}>YOUR DAY</Text>
             <Text style={s.title}>My tasks</Text>
@@ -273,7 +276,7 @@ export function EmployeeScreens(p: Props) {
               ))
             ) : (
               <View style={s.card}>
-                <Text style={s.cardTitle}>You’re all clear.</Text>
+                <Text style={s.cardTitle}>No assigned tasks</Text>
                 <Text style={s.body}>
                   Tasks from your manager will appear here. You can still start
                   your workday.
@@ -284,8 +287,8 @@ export function EmployeeScreens(p: Props) {
           </>
         ) : (
           <>
-            <Text style={s.eyebrow}>WE’RE HERE TO HELP</Text>
-            <Text style={s.title}>Need a hand?</Text>
+            <Text style={s.eyebrow}>SETTINGS & SUPPORT</Text>
+            <Text style={s.title}>Settings</Text>
             <View style={s.card}>
               <Text style={s.cardTitle}>How to use this app</Text>
               <Text style={s.step}>1. On My day, tap Start work.</Text>
@@ -359,6 +362,7 @@ export function EmployeeScreens(p: Props) {
             [
               ["work", "My day"],
               ["tasks", "My tasks"],
+              ["records", "Records"],
               ["help", "Help"],
             ] as const
           ).map(([id, label]) => (

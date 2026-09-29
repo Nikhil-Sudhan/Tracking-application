@@ -123,7 +123,7 @@ async function enqueue(
     );
     const session = row ? (JSON.parse(row.value) as Session | null) : null;
     if (!session) {
-      console.info('[GroSuite location] skipped: no active shift');
+      console.info("[GroSuite location] skipped: no active shift");
       return;
     }
     if (expectedShiftId && session.shiftId !== expectedShiftId) return;
@@ -134,7 +134,16 @@ async function enqueue(
         loc.timestamp > Date.now() + 30000 ||
         loc.coords.accuracy === null
       ) {
-        console.info('[GroSuite location] rejected', JSON.stringify({mocked: loc.mocked, captured: loc.timestamp, shiftStarted: session.started, now: Date.now(), accuracy: loc.coords.accuracy}));
+        console.info(
+          "[GroSuite location] rejected",
+          JSON.stringify({
+            mocked: loc.mocked,
+            captured: loc.timestamp,
+            shiftStarted: session.started,
+            now: Date.now(),
+            accuracy: loc.coords.accuracy,
+          }),
+        );
         continue;
       }
       await txn.runAsync(
@@ -147,7 +156,7 @@ async function enqueue(
         Math.min(Date.now(), loc.timestamp),
         battery < 0 ? null : Math.round(battery * 100),
       );
-      console.info('[GroSuite location] queued');
+      console.info("[GroSuite location] queued");
     }
   });
 }
@@ -155,17 +164,20 @@ TaskManager.defineTask<{ locations: Location.LocationObject[] }>(
   LOCATION_TASK,
   async ({ data, error }) => {
     if (error) {
-      console.warn('[GroSuite location] task error', error.message);
+      console.warn("[GroSuite location] task error", error.message);
       await setValue("syncError", error.message);
       return;
     }
     if (!data) return;
-    console.info('[GroSuite location] received', data.locations?.length);
+    console.info("[GroSuite location] received", data.locations?.length);
     try {
       await enqueue(data.locations);
       await sync();
     } catch (e) {
-      console.warn('[GroSuite location] processing failed', (e as Error).message);
+      console.warn(
+        "[GroSuite location] processing failed",
+        (e as Error).message,
+      );
       await setValue("syncError", (e as Error).message);
     }
   },
@@ -185,10 +197,49 @@ export async function startShift() {
   const pending =
     (await getValue<string>("pendingStart")) ?? Crypto.randomUUID();
   await setValue("pendingStart", pending);
+  const policy = await api();
+  let location:
+    | {
+        lat: number;
+        lng: number;
+        accuracy: number | null;
+        captured: number;
+        mocked: boolean;
+      }
+    | undefined;
+  if (policy.sites?.length && !policy.shift) {
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const fix = await Promise.race([
+        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High }),
+        new Promise<never>((_, reject) => {
+          timeout = setTimeout(
+            () =>
+              reject(
+                new Error(
+                  "Could not get an accurate location. Move outdoors and try clocking in again.",
+                ),
+              ),
+            25000,
+          );
+        }),
+      ]);
+      location = {
+        lat: fix.coords.latitude,
+        lng: fix.coords.longitude,
+        accuracy: fix.coords.accuracy,
+        captured: fix.timestamp,
+        mocked: fix.mocked ?? false,
+      };
+    } finally {
+      if (timeout) clearTimeout(timeout);
+    }
+  }
   const result = await api({
     action: "start",
     shiftId: pending,
     device: Platform.OS === "ios" ? "iOS" : "Android",
+    ...(location ? { location } : {}),
   });
   const session: Session = {
     shiftId: result.shift.id,

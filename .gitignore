@@ -55,3 +55,7 @@ next-env.d.ts
 /backend/.dev.vars
 /backend/.wrangler/
 !/.env.example
+
+/dist-selfhost/
+/backend/data/
+/deploy/.env
